@@ -91,12 +91,15 @@ app.post("/remove-bot", (req, res) => {
             clearTimeout(bot.timer);
             console.log(`Bot ${botId} stopped processing`);
 
-            // If the bot was processing an order, reset its status
-            const order = pendingOrders.find(order => order.processingBy === botId);
+            // If the bot was processing an order, update its status
+            const order = pendingOrders.find(order => order.processingBy == botId);
             if (order) {
-                order.processing = false;
-                order.processingBy = null; // Reset the processing bot reference
-                console.log(`Order #${order.id} reset to pending`);
+                // If the order was being processed, we leave it as is (we don't reset to pending)
+                order.processingBy = null; // Remove the bot reference, but don't reset processing
+                console.log(`Order #${order.id} is now unassigned`);
+
+                // Optionally, you can move the order to another state (e.g., "waiting for bot")
+                order.status = 'waiting for bot';  // Indicating that the order needs to be assigned to another bot
             }
         }
 
@@ -115,6 +118,7 @@ app.post("/remove-bot", (req, res) => {
         res.status(400).send({ message: "No bots to remove" });
     }
 });
+
 
 // Start the server
 const PORT = 3000;

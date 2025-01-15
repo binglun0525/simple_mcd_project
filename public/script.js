@@ -16,6 +16,12 @@ async function fetchStatus() {
     completedOrders.innerHTML = data.completedOrders
         .map(order => `<li>Order #${order.id} (${order.type})</li>`)
         .join("");
+
+    // Display Bot Information
+    const botStatus = document.getElementById("botStatus");
+    botStatus.innerHTML = data.bots.length
+        ? data.bots.map(botId => `Bot ${botId}`).join(", ")
+        : "No bots available";
 }
 
 // Add a new order
@@ -25,19 +31,19 @@ async function addOrder(type) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type }),
     });
-    fetchStatus();
+    fetchStatus();  // Refresh status after adding an order
 }
 
 // Add a new bot
 async function addBot() {
     await fetch(`${API_URL}/add-bot`, { method: "POST" });
-    fetchStatus();
+    fetchStatus();  // Refresh status after adding a bot
 }
 
 // Remove the newest bot
 async function removeBot() {
     await fetch(`${API_URL}/remove-bot`, { method: "POST" });
-    fetchStatus();
+    fetchStatus();  // Refresh status after removing a bot
 }
 
 // Initial load
