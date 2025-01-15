@@ -8,7 +8,7 @@ app.use(express.json());
 let orderId = 1;
 let pendingOrders = [];
 let completedOrders = [];
-const bots = {}; // Store bot data
+const bots = {};
 
 // Add a new order
 app.post("/new-order", (req, res) => {
@@ -31,7 +31,7 @@ app.post("/new-order", (req, res) => {
 
     // Check if there are any idle bots and assign them orders
     Object.keys(bots).forEach(botId => {
-        // If bot is idle (not processing any order), start processing a new order
+        // If not processing any order, start processing a new order
         if (!pendingOrders.find(order => order.processingBy === botId) && pendingOrders.length > 0) {
             processOrder(botId); // Start processing if the bot is idle and there are pending orders
         }
@@ -42,6 +42,7 @@ app.post("/new-order", (req, res) => {
 
 // Helper function to process orders
 function processOrder(botId) {
+
     // Find the next unprocessed order
     var orderIndex = pendingOrders.findIndex(order => !order.processing && !order.processingBy);
 
@@ -58,7 +59,6 @@ function processOrder(botId) {
     order.processing = true; // Mark as processing
     console.log(`Bot ${botId} started processing Order #${order.id}`);
 
-    // Save the timeout reference in the bot
     bots[botId].timer = setTimeout(() => {
         completedOrders.push(order); // Push to completed area
         pendingOrders = pendingOrders.filter(order => order.id !== order_id); // Remove from pending area
@@ -66,7 +66,7 @@ function processOrder(botId) {
         console.log(`Bot ${botId} completed Order #${order.id}`);
 
         // After completing an order, check for new orders to process
-        processOrder(botId); // Continue processing the next order if available
+        processOrder(botId);
     }, 10000); // 10 seconds delay for processing each order
 }
 
@@ -105,7 +105,6 @@ app.post("/remove-bot", (req, res) => {
             console.log(`Order #${order.id} is now back in the pending queue`);
         }
 
-        // Clear the bot's timer if it exists
         if (bot.timer) {
             clearTimeout(bot.timer);
             console.log(`Bot ${botId} stopped processing`);
