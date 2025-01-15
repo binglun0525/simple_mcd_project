@@ -9,14 +9,15 @@ app.use(express.json());
 let orderId = 1;
 const pendingOrders = [];
 const completedOrders = [];
-const bots = {}; // Use an object to store bot details (id and timer references)
+const bots = {}; // Store bot data (id and its timer)
 
 // Helper function to process orders
 function processOrder(botId) {
-    const orderIndex = pendingOrders.findIndex(order => !order.processing);
+    const orderIndex = pendingOrders.findIndex(order => !order.processing && !order.processingBy);
 
     if (orderIndex >= 0) {
         const order = pendingOrders[orderIndex];
+        order.processingBy = botId; // Mark order as being processed by this bot
         order.processing = true; // Mark as processing
         console.log(`Bot ${botId} started processing Order #${order.id}`);
 
@@ -42,7 +43,7 @@ app.get("/status", (req, res) => {
 // Add a new order
 app.post("/new-order", (req, res) => {
     const { type } = req.body;
-    const order = { id: orderId++, type, processing: false };
+    const order = { id: orderId++, type, processing: false, processingBy: null };
     if (type === "VIP") {
         // VIP orders go before normal orders
         const vipIndex = pendingOrders.findIndex(o => o.type !== "VIP");
@@ -55,6 +56,15 @@ app.post("/new-order", (req, res) => {
         pendingOrders.push(order);
     }
     console.log(`Added ${type} Order #${order.id}`);
+
+    // Start processing if there's a bot and no order is currently being processed
+    for (const botId of Object.keys(bots)) {
+        if (!pendingOrders.find(order => order.processing)) {
+            processOrder(botId); // Start processing if no order is being processed
+            break;
+        }
+    }
+
     res.status(201).json(order);
 });
 
@@ -63,6 +73,8 @@ app.post("/add-bot", (req, res) => {
     const botId = Object.keys(bots).length + 1;
     bots[botId] = {}; // Create a new bot
     console.log(`Bot ${botId} added`);
+
+    // Start processing orders immediately
     processOrder(botId); // Start processing orders
     res.status(201).json({ id: botId });
 });
@@ -80,15 +92,24 @@ app.post("/remove-bot", (req, res) => {
             console.log(`Bot ${botId} stopped processing`);
 
             // If the bot was processing an order, reset its status
-            const order = pendingOrders.find(order => order.processing);
+            const order = pendingOrders.find(order => order.processingBy === botId);
             if (order) {
                 order.processing = false;
+                order.processingBy = null; // Reset the processing bot reference
                 console.log(`Order #${order.id} reset to pending`);
             }
         }
 
         delete bots[botId];
         console.log(`Bot ${botId} removed`);
+
+        // Check if there are still pending orders and if any bot should start processing
+        for (const id of Object.keys(bots)) {
+            if (!pendingOrders.find(order => order.processing)) {
+                processOrder(id); // Start processing if no order is being processed
+            }
+        }
+
         res.status(200).send({ message: `Bot ${botId} removed` });
     } else {
         res.status(400).send({ message: "No bots to remove" });
