@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>McDonald's Order System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            margin-bottom: 20px;
+        }
+        .area {
+            display: flex;
+            gap: 20px;
+        }
+        .section {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 45%;
+            background-color: #f9f9f9;
+        }
+        .section h3 {
+            margin-top: 0;
+        }
+        button {
+            margin-right: 10px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>McDonald's Order System</h1>
+
+    <div class="container">
+        <button onclick="addOrder('NORMAL')">New Normal Order</button>
+        <button onclick="addOrder('VIP')">New VIP Order</button>
+        <button onclick="addBot()">+ Bot</button>
+        <button onclick="removeBot()">- Bot</button>
+    </div>
+
+    <div class="area">
+        <div class="section" id="pendingArea">
+            <h3>Pending Orders</h3>
+            <ul id="pendingOrders"></ul>
+        </div>
+        <div class="section" id="completeArea">
+            <h3>Completed Orders</h3>
+            <ul id="completedOrders"></ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
