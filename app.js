@@ -5,45 +5,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// In-memory data
 let orderId = 1;
-const pendingOrders = [];
-const completedOrders = [];
-const bots = {}; // Store bot data (id and its timer)
-
-// Helper function to process orders
-function processOrder(botId) {
-    const orderIndex = pendingOrders.findIndex(order => !order.processing && !order.processingBy);
-
-    if (orderIndex >= 0) {
-        const order = pendingOrders[orderIndex];
-        order.processingBy = botId; // Mark order as being processed by this bot
-        order.processing = true; // Mark as processing
-        console.log(`Bot ${botId} started processing Order #${order.id}`);
-
-        // Save the timeout reference in the bot
-        bots[botId].timer = setTimeout(() => {
-            completedOrders.push(order);
-            pendingOrders.splice(orderIndex, 1); // Remove from pending
-            console.log(`Bot ${botId} completed Order #${order.id}`);
-            processOrder(botId); // Continue processing the next order
-        }, 10000); // 10 seconds delay
-    } else {
-        console.log(`Bot ${botId} is idle`);
-    }
-}
-
-// API Endpoints
-
-// Get current status
-app.get("/status", (req, res) => {
-    res.json({ orders: pendingOrders, completedOrders, bots: Object.keys(bots) });
-});
+let pendingOrders = [];
+let completedOrders = [];
+const bots = {}; // Store bot data
 
 // Add a new order
 app.post("/new-order", (req, res) => {
     const { type } = req.body;
     const order = { id: orderId++, type, processing: false, processingBy: null };
+
+    // Add order to pendingOrders based on type
     if (type === "VIP") {
         // VIP orders go before normal orders
         const vipIndex = pendingOrders.findIndex(o => o.type !== "VIP");
@@ -57,25 +29,61 @@ app.post("/new-order", (req, res) => {
     }
     console.log(`Added ${type} Order #${order.id}`);
 
-    // Start processing if there's a bot and no order is currently being processed
-    for (const botId of Object.keys(bots)) {
-        if (!pendingOrders.find(order => order.processing)) {
-            processOrder(botId); // Start processing if no order is being processed
-            break;
+    // Check if there are any idle bots and assign them orders
+    Object.keys(bots).forEach(botId => {
+        // If bot is idle (not processing any order), start processing a new order
+        if (!pendingOrders.find(order => order.processingBy === botId) && pendingOrders.length > 0) {
+            processOrder(botId); // Start processing if the bot is idle and there are pending orders
         }
-    }
+    });
 
     res.status(201).json(order);
+});
+
+// Helper function to process orders
+function processOrder(botId) {
+    // Find the next unprocessed order
+    var orderIndex = pendingOrders.findIndex(order => !order.processing && !order.processingBy);
+
+    // If there's no unprocessed order, stop further processing
+    if (orderIndex < 0) {
+        console.log(`Bot ${botId} is idle, no orders to process`);
+        return; // Stop further processing
+    }
+
+    var order = pendingOrders[orderIndex];
+    var order_id = order.id;
+
+    order.processingBy = botId; // Mark order as being processed by this bot
+    order.processing = true; // Mark as processing
+    console.log(`Bot ${botId} started processing Order #${order.id}`);
+
+    // Save the timeout reference in the bot
+    bots[botId].timer = setTimeout(() => {
+        completedOrders.push(order); // Push to completed area
+        pendingOrders = pendingOrders.filter(order => order.id !== order_id); // Remove from pending area
+
+        console.log(`Bot ${botId} completed Order #${order.id}`);
+
+        // After completing an order, check for new orders to process
+        processOrder(botId); // Continue processing the next order if available
+    }, 10000); // 10 seconds delay for processing each order
+}
+
+
+// Get current status
+app.get("/status", (req, res) => {
+    res.json({ orders: pendingOrders, completedOrders, bots: Object.keys(bots) });
 });
 
 // Add a new bot
 app.post("/add-bot", (req, res) => {
     const botId = Object.keys(bots).length + 1;
-    bots[botId] = {}; // Create a new bot
+    bots[botId] = {};
     console.log(`Bot ${botId} added`);
 
     // Start processing orders immediately
-    processOrder(botId); // Start processing orders
+    processOrder(botId);
     res.status(201).json({ id: botId });
 });
 
@@ -83,33 +91,34 @@ app.post("/add-bot", (req, res) => {
 app.post("/remove-bot", (req, res) => {
     const botIds = Object.keys(bots);
     if (botIds.length > 0) {
-        const botId = botIds[botIds.length - 1];
+        const botId = botIds[botIds.length - 1];  // Get the newest bot
         const bot = bots[botId];
 
-        // Clear the bot's timer
+        // Find the order that was being processed by this bot
+        const order = pendingOrders.find(order => order.processingBy == botId);
+
+        if (order) {
+            // Move the order back to "PENDING" and remove the processing bot reference
+            order.processingBy = null;
+            order.status = 'PENDING';
+            order.processing = false;
+            console.log(`Order #${order.id} is now back in the pending queue`);
+        }
+
+        // Clear the bot's timer if it exists
         if (bot.timer) {
             clearTimeout(bot.timer);
             console.log(`Bot ${botId} stopped processing`);
-
-            // If the bot was processing an order, update its status
-            const order = pendingOrders.find(order => order.processingBy == botId);
-            if (order) {
-                // If the order was being processed, we leave it as is (we don't reset to pending)
-                order.processingBy = null; // Remove the bot reference, but don't reset processing
-                console.log(`Order #${order.id} is now unassigned`);
-
-                // Optionally, you can move the order to another state (e.g., "waiting for bot")
-                order.status = 'waiting for bot';  // Indicating that the order needs to be assigned to another bot
-            }
         }
 
+        // Remove the bot from the bots object
         delete bots[botId];
         console.log(`Bot ${botId} removed`);
 
-        // Check if there are still pending orders and if any bot should start processing
+        // After removing the bot, check if any other bot should start processing
         for (const id of Object.keys(bots)) {
             if (!pendingOrders.find(order => order.processing)) {
-                processOrder(id); // Start processing if no order is being processed
+                processOrder(id);  // Start processing if there are no orders being processed
             }
         }
 
@@ -118,7 +127,6 @@ app.post("/remove-bot", (req, res) => {
         res.status(400).send({ message: "No bots to remove" });
     }
 });
-
 
 // Start the server
 const PORT = 3000;
